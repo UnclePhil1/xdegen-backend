@@ -1,16 +1,28 @@
+require('dotenv').config();
 const express = require('express');
 const mongoose = require('mongoose');
 const cors = require('cors');
 
 const app = express();
 const PORT = process.env.PORT || 5000;
-const server = process.env.MONGO_DB_SERVER;
+const SERVER = process.env.MONGO_DB_SERVER;
+const corsOptions = {
+  origin: 'https://xdgen.vercel.app',  // Replace with your frontend URL
+  optionsSuccessStatus: 200,
+};
+
+if (!SERVER) {
+  console.error('Error: MONGO_DB_SERVER is not defined in the environment variables.');
+  process.exit(1);  // Exit the process if the environment variable is missing
+}
+
+
 // Middleware
-app.use(cors());
+app.use(cors(corsOptions));
 app.use(express.json());
 
 // MongoDB connection
-mongoose.connect(server, { useNewUrlParser: true, useUnifiedTopology: true })
+mongoose.connect(SERVER, { useNewUrlParser: true, useUnifiedTopology: true })
     .then(() => console.log('MongoDB connected'))
     .catch(err => console.log(err));
 
