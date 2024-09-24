@@ -19,7 +19,10 @@ if (!MONGO_URI) {
 }
 
 // Middleware
-app.use(cors()); // Enable CORS
+app.use(cors({
+    origin: '*', // Allow all origins or specify your frontend URL
+    methods: 'GET,POST'
+})); // Enable CORS
 app.use(express.json()); // Parse incoming JSON requests
 
 // MongoDB connection
@@ -32,7 +35,7 @@ mongoose.connect(MONGO_URI, { useNewUrlParser: true, useUnifiedTopology: true })
 
 // Waitlist schema and model
 const waitlistSchema = new mongoose.Schema({
-  email: { type: String, required: true },
+  email: { type: String, required: true, unique: true }, // Ensure email is unique
   date: { type: Date, default: Date.now },
 });
 
@@ -51,7 +54,7 @@ app.post('/api/waitlist', async (req, res) => {
     // Check if email is already in the waitlist
     const existingEmail = await Waitlist.findOne({ email });
     if (existingEmail) {
-      return res.status(400).json({ message: 'Email is already in the waitlist' });
+      return res.status(409).json({ message: 'Email is already in the waitlist' }); // 409 Conflict
     }
 
     // Add new email to the waitlist
