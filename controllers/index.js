@@ -92,6 +92,7 @@ export const swapsolana = async (req, res) => {
       devSolMintAddress, // DeVSol mint address provided by the frontend
       userWallet // User's wallet to receive DeVSol
     );
+    console.log("🚀 ~ swapsolana ~ userDevSolTokenAccount:", userDevSolTokenAccount)
 
     // Ensure the program has an associated token account for DeVSol (program receives DeVSol)
     const programDevSolTokenAccount = await getOrCreateAssociatedTokenAccount(
@@ -100,20 +101,25 @@ export const swapsolana = async (req, res) => {
       devSolMintAddress, // DeVSol mint address
       programWallet.publicKey // Program wallet
     );
+    console.log("🚀 ~ swapsolana ~ programDevSolTokenAccount:", programDevSolTokenAccount)
 
     // Ensure the user has an associated token account for the target token (e.g., USDC)
     const userTargetTokenAccount = await getOrCreateAssociatedTokenAccount(
       connection,
+      programWallet,
       tokenMint.publicKey, // Target token mint address
       userWallet // User's wallet to receive target tokens
     );
+    console.log("🚀 ~ swapsolana ~ userTargetTokenAccount:", userTargetTokenAccount)
 
     // Ensure the program has an associated token account for the target token (program sends the target token)
     const programTargetTokenAccount = await getOrCreateAssociatedTokenAccount(
       connection,
+      programWallet,
       tokenMint.publicKey, // Target token mint address
       programWallet.publicKey // Program wallet
     );
+    console.log("🚀 ~ swapsolana ~ programTargetTokenAccount:", programTargetTokenAccount)
 
     // Step 1: Transfer DeVSol from the user to the program's DeVSol token account
     const transferDevSolInstruction = splToken.Token.createTransferInstruction(
