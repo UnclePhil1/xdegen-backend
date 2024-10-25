@@ -1,6 +1,6 @@
 import { LAMPORTS_PER_SOL, sendAndConfirmTransaction } from "@solana/web3.js";
 import bs58 from "@coral-xyz/anchor/dist/cjs/utils/bytes/bs58.js";
-import { createMint } from '@solana/spl-token';
+// import { createMint } from '@solana/spl-token';
 import {
   Connection,
   PublicKey,
@@ -299,6 +299,7 @@ const createTokenIfNotExists = async (
     9, // Decimals
     TOKEN_PROGRAM_ID
   );
+  console.log("🚀 ~ tokenMint:", tokenMint)
 
   // Store the token name and mint address in the database
   await Token.insertOne({
