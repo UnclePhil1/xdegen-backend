@@ -37,7 +37,7 @@ const adminPrivateKeyBytess = bs58.decode(programWalletPrivateKeyBase58);
 
 if (adminPrivateKeyBytess.length === 64) {
   programWallet = Keypair.fromSecretKey(adminPrivateKeyBytess);
-  console.log("programWallet Public Key:", programWallet.publicKey.toString());
+  // console.log("programWallet Public Key:", programWallet.publicKey.toString());
 } else {
   console.error("Error: Invalid secret key length. Expected 64 bytes.");
 }
@@ -141,11 +141,11 @@ export const swapsolana = async (req, res) => {
     const serializedTransaction = transaction.serialize({
       requireAllSignatures: false,
     });
-    const transactionBase64 = serializedTransaction.toString("base64");
+    // const transactionBase64 = serializedTransaction.toString("base64");
 
     // Return the transaction to the frontend for the user to sign
     res.json({
-      transaction: transactionBase64,
+      // transaction: transactionBase64,
       devSolMintAddress: devSolMintAddress.toBase58(), // Return the DeVSol mint address
       targetTokenAmount: targetTokenAmount, // Return the target token amount to be transferred
       targetTokenMintAddress: tokenMint.publicKey.toBase58(), // Return the target token mint address
@@ -297,7 +297,6 @@ const createTokenIfNotExists = async (
     mintAuthority.publicKey, // Mint authority
     null, // Freeze authority
     9, // Decimals
-    TOKEN_PROGRAM_ID
   );
   console.log("🚀 ~ tokenMint:", tokenMint)
 
@@ -316,6 +315,7 @@ const createTokenIfNotExists = async (
   const programTokenAccount = await tokenMint.getOrCreateAssociatedAccountInfo(
     programWallet.publicKey
   );
+  console.log("🚀 ~ programTokenAccount:", programTokenAccount)
 
   // Mint the initial supply of tokens to the program's token account
   await tokenMint.mintTo(
