@@ -60,9 +60,9 @@ export const swapsolana = async (req, res) => {
 
     // Fetch price feed for the pair
     const tokenPair = `SOL/${tokenName}`;
-    const tokenPrice = tokenPair;
+    // const tokenPrice = tokenPair;
 
-    if (!tokenPrice) {
+    if (!priceFeed) {
       return res.status(400).json({ error: "Token pair not supported" });
     }
 
@@ -76,7 +76,6 @@ export const swapsolana = async (req, res) => {
       programWallets,
       1000000000
     ); // Initial supply of 1B tokens for example
-    console.log("🚀 ~ swapsolana ~ tokenMint:", tokenMint);
 
   //   const programTokenAccount = await getOrCreateAssociatedTokenAccount(
   //     connection,    // Connection to the Solana cluster
@@ -92,7 +91,6 @@ export const swapsolana = async (req, res) => {
       devSolMintAddress, // DeVSol mint address provided by the frontend
       userWallet // User's wallet to receive DeVSol
     );
-    console.log("🚀 ~ swapsolana ~ userDevSolTokenAccount:", userDevSolTokenAccount)
 
     // Ensure the program has an associated token account for DeVSol (program receives DeVSol)
     const programDevSolTokenAccount = await getOrCreateAssociatedTokenAccount(
@@ -101,28 +99,27 @@ export const swapsolana = async (req, res) => {
       devSolMintAddress, // DeVSol mint address
       programWallet.publicKey // Program wallet
     );
-    console.log("🚀 ~ swapsolana ~ programDevSolTokenAccount:", programDevSolTokenAccount)
 
     // Ensure the user has an associated token account for the target token (e.g., USDC)
     const userTargetTokenAccount = await getOrCreateAssociatedTokenAccount(
       connection,
       programWallet,
-      tokenMint.publicKey, // Target token mint address
+      tokenMint, // Target token mint address
       userWallet // User's wallet to receive target tokens
     );
-    console.log("🚀 ~ swapsolana ~ userTargetTokenAccount:", userTargetTokenAccount)
 
     // Ensure the program has an associated token account for the target token (program sends the target token)
     const programTargetTokenAccount = await getOrCreateAssociatedTokenAccount(
       connection,
       programWallet,
-      tokenMint.publicKey, // Target token mint address
+      tokenMint, // Target token mint address
       programWallet.publicKey // Program wallet
     );
-    console.log("🚀 ~ swapsolana ~ programTargetTokenAccount:", programTargetTokenAccount)
+
+    const { blockhash } = await connection.getLatestBlockhash();
 
     // Step 1: Transfer DeVSol from the user to the program's DeVSol token account
-    const transferDevSolInstruction = splToken.Token.createTransferInstruction(
+    const transferDevSolInstruction = splToken.createTransferInstruction(
       userDevSolTokenAccount.address, // User's DeVSol token account
       programDevSolTokenAccount.address, // Program's DeVSol token account
       userWallet, // User's wallet as the owner of the DeVSol account
@@ -131,19 +128,26 @@ export const swapsolana = async (req, res) => {
     );
 
     // Step 2: Transfer the corresponding amount of the target token from the program to the user's account
-    const transferTargetTokenInstruction =
-      splToken.Token.createTransferInstruction(
+    const transferTargetTokenInstruction = splToken.createTransferInstruction(
         programTargetTokenAccount.address, // Program's target token account
         userTargetTokenAccount.address, // User's target token account
         programWallet.publicKey, // Program's wallet as the owner of the target token account
         [], // No multisig signers
         targetTokenAmount * 1e9 // Transfer amount in the target token (assuming 6 decimals for USDC, adjust for others)
       );
+    console.log("🚀 ~ swapsolana ~ transferTargetTokenInstruction:", transferTargetTokenInstruction)
 
     // Add both instructions (DeVSol transfer and target token transfer) to the transaction
-    const transaction = new Transaction().add(transferDevSolInstruction);
 
-    const transactions = new Transaction().add(transferTargetTokenInstruction);
+    const transaction = new Transaction();
+    transaction.recentBlockhash = blockhash;
+    transaction.feePayer = programWallet.publicKey; // Set the payer
+    transaction.add(transferDevSolInstruction);
+    
+    const transactions = new Transaction();
+    transaction.recentBlockhash = blockhash;
+    transaction.feePayer = programWallet.publicKey; // Set the payer
+    transactions.add(transferTargetTokenInstruction);
 
     // Sign the transaction with the program wallet's private key
     await sendAndConfirmTransaction(
@@ -156,14 +160,14 @@ export const swapsolana = async (req, res) => {
     const serializedTransaction = transaction.serialize({
       requireAllSignatures: false,
     });
-    // const transactionBase64 = serializedTransaction.toString("base64");
+    const transactionBase64 = serializedTransaction.toString("base64");
 
     // Return the transaction to the frontend for the user to sign
     res.json({
-      // transaction: transactionBase64,
+      transaction: transactionBase64,
       devSolMintAddress: devSolMintAddress.toBase58(), // Return the DeVSol mint address
       targetTokenAmount: targetTokenAmount, // Return the target token amount to be transferred
-      targetTokenMintAddress: tokenMint.publicKey.toBase58(), // Return the target token mint address
+      targetTokenMintAddress: tokenMint.toString(), // Return the target token mint address
       devSolAmount: devSolAmount, // Amount of DeVSol being swapped
       exchangeRate: tokenPrice, // The exchange rate used for the transaction
       userWalletAddress: userWallet.toBase58(), // User's wallet address
@@ -184,6 +188,15 @@ export const swapothers = async (req, res) => {
     priceFeed,
   } = req.body;
 
+  console.log(
+    "🚀 ~ swapothers ~  userPublicKey,devSolAmount, devSolMint,targetTokenMint,priceFeed,:",
+    userPublicKey,
+    targetTokenAmount,
+    targetTokenMint,
+    devSolMint,
+    priceFeed,
+  );
+
   try {
     const userWallet = new PublicKey(userPublicKey);
     const targetTokenMintAddress = new PublicKey(targetTokenMint);
@@ -191,18 +204,19 @@ export const swapothers = async (req, res) => {
 
     // Get the conversion rate from the price feed (e.g., USDC -> DeVSol)
     const tokenPair = `${targetTokenMint}/DeVSol`;
-    const conversionRate = priceFeed[tokenPair]; // e.g., 1 USDC = 0.04 DeVSol (example rate)
+    // const conversionRate = priceFeed[tokenPair]; // e.g., 1 USDC = 0.04 DeVSol (example rate)
 
-    if (!conversionRate) {
-      throw new Error(`Conversion rate for ${tokenPair} not found.`);
+    if (!priceFeed) {
+      return res.status(400).json({ error: "Token pair not supported" });
     }
 
     // Calculate the amount of DeVSol the user will receive
-    const devSolAmount = targetTokenAmount * conversionRate;
+    const devSolAmount = targetTokenAmount * priceFeed;
 
     // Step 1: Ensure the user has an associated token account for the target token (e.g., USDC)
     const userTargetTokenAccount = await getOrCreateAssociatedTokenAccount(
       connection,
+      programWallet,
       targetTokenMintAddress, // Target token mint (e.g., USDC)
       userWallet // User's wallet for holding the target token
     );
@@ -210,6 +224,7 @@ export const swapothers = async (req, res) => {
     // Step 2: Ensure the program has an associated token account for the target token
     const programTargetTokenAccount = await getOrCreateAssociatedTokenAccount(
       connection,
+      programWallet,
       targetTokenMintAddress, // Target token mint (e.g., USDC)
       programWallet.publicKey // Program's wallet to receive target tokens
     );
@@ -217,6 +232,7 @@ export const swapothers = async (req, res) => {
     // Step 3: Ensure the user has an associated token account for DeVSol
     const userDevSolTokenAccount = await getOrCreateAssociatedTokenAccount(
       connection,
+      programWallet,
       devSolMintAddress, // DeVSol mint address
       userWallet // User's wallet to receive DeVSol
     );
@@ -224,13 +240,16 @@ export const swapothers = async (req, res) => {
     // Step 4: Ensure the program has an associated token account for DeVSol
     const programDevSolTokenAccount = await getOrCreateAssociatedTokenAccount(
       connection,
+      programWallet,
       devSolMintAddress, // DeVSol mint address
       programWallet.publicKey // Program's wallet for DeVSol
     );
 
+    const { blockhash } = await connection.getLatestBlockhash();
+
     // Step 5: Transfer target tokens (e.g., USDC) from the user to the program
     const transferTargetTokenInstruction =
-      splToken.Token.createTransferInstruction(
+      splToken.createTransferInstruction(
         userTargetTokenAccount.address, // User's target token account (e.g., USDC)
         programTargetTokenAccount.address, // Program's target token account
         userWallet, // User's wallet as the signer
@@ -238,8 +257,12 @@ export const swapothers = async (req, res) => {
         targetTokenAmount * 1e9 // Amount of target token to transfer (assuming 6 decimals for USDC)
       );
 
+      const userTransaction = new Transaction();
+    userTransaction.recentBlockhash = blockhash;
+    userTransaction.feePayer = programWallet.publicKey; // Set the payer
+
     // Create the transaction with the transfer instruction
-    const userTransaction = new Transaction().add(
+    userTransaction.add(
       transferTargetTokenInstruction
     );
 
@@ -250,7 +273,7 @@ export const swapothers = async (req, res) => {
     const transactionBase64 = serializedTransaction.toString("base64");
 
     // Step 6: Transfer DeVSol from the program to the user
-    const transferDevSolInstruction = splToken.Token.createTransferInstruction(
+    const transferDevSolInstruction = splToken.createTransferInstruction(
       programDevSolTokenAccount.address, // Program's DeVSol account
       userDevSolTokenAccount.address, // User's DeVSol account
       programWallet.publicKey, // Program's wallet as the signer for DeVSol transfer
@@ -259,7 +282,12 @@ export const swapothers = async (req, res) => {
     );
 
     // Step 7: Create the transaction for the program to sign
-    const programTransaction = new Transaction().add(transferDevSolInstruction);
+    const programTransaction = new Transaction();
+    programTransaction.recentBlockhash = blockhash;
+    programTransaction.feePayer = programWallet.publicKey; // Set the payer
+    programTransaction.add(transferDevSolInstruction);
+    
+
 
     // Sign the transaction with the program's wallet and send it to the Solana network
     const programSignature = await sendAndConfirmTransaction(
@@ -275,7 +303,7 @@ export const swapothers = async (req, res) => {
       devSolAmount: devSolAmount, // Amount of DeVSol the user will receive
       targetTokenMint: targetTokenMint, // The mint address of the target token
       devSolMint: devSolMint, // The mint address of DeVSol
-      exchangeRate: conversionRate, // The conversion rate used
+      exchangeRate: priceFeed, // The conversion rate used
       programSignature, // The signature for the program's transaction
     });
   } catch (err) {
@@ -358,3 +386,6 @@ console.log("Token Mint Public Key:", tokenMintString);
   return tokenMint;
   // return tokenMint.publicKey.toBase58();
 };
+
+
+// GzrKbjF3Z14ET9ADHwM6iNzhnJEqUTvaDQNDHbHk5sED
