@@ -37,7 +37,7 @@ const adminPrivateKeyBytess = bs58.decode(programWalletPrivateKeyBase58);
 
 if (adminPrivateKeyBytess.length === 64) {
   programWallet = Keypair.fromSecretKey(adminPrivateKeyBytess);
-  // console.log("programWallet Public Key:", programWallet.publicKey.toString());
+  console.log("programWallet Public Key:", programWallet.publicKey.toString());
 } else {
   console.error("Error: Invalid secret key length. Expected 64 bytes.");
 }
@@ -281,7 +281,7 @@ const createTokenIfNotExists = async (
   connectDB();
 
   // Check if the token exists in the database
-  const existingToken = await Token.findOne({ tokenName });
+  const existingToken = await Token.findOne({ name: tokenName });
 
   if (existingToken) {
     console.log(
@@ -298,32 +298,44 @@ const createTokenIfNotExists = async (
     null, // Freeze authority
     9, // Decimals
   );
-  console.log("🚀 ~ tokenMint:", tokenMint)
+  const tokenMintString = tokenMint.toString();
+console.log("Token Mint Public Key:", tokenMintString);
 
   // Store the token name and mint address in the database
-  await Token.insertOne({
-    tokenName: tokenName,
-    mintAddress: tokenMint.publicKey.toBase58(),
+  await Token.create({
+    name: tokenName,
+    mintAddress: tokenMintString,
+    // mintAddress: tokenMint.publicKey.toBase58(),
     createdAt: new Date(), // Optional: You can store the date the token was created
   });
 
-  console.log(
-    `Minted new token ${tokenName} with mint address: ${tokenMint.publicKey.toBase58()}`
-  );
+  // console.log(
+  //   // `Minted new token ${tokenName} with mint address: ${tokenMint.publicKey.toBase58()}`
+  // );
+  const programTokenAccount = await getOrCreateAssociatedTokenAccount(
+    connection,    // Connection to the Solana cluster
+    programWallet,         // Payer's Keypair
+    tokenMint,          // Mint address (should be a valid PublicKey)
+    programWallet.publicKey         // Owner's address (should be a valid PublicKey)
+);
 
   // Get the program's associated token account for this mint
-  const programTokenAccount = await tokenMint.getOrCreateAssociatedAccountInfo(
-    programWallet.publicKey
-  );
+  // // const programTokenAccount = await tokenMint.getOrCreateAssociatedAccountInfo(
+  // //   programWallet.publicKey
+  // // );
   console.log("🚀 ~ programTokenAccount:", programTokenAccount)
 
   // Mint the initial supply of tokens to the program's token account
-  await tokenMint.mintTo(
-    programTokenAccount.address, // Program's token account
-    mintAuthority.publicKey, // Mint authority
-    [], // No multisig signers
-    initialSupply * 1e9 // Initial supply (assuming 9 decimals)
-  );
+
+  await mintTo(
+    connection,
+    programWallet,
+    tokenMint,
+    programTokenAccount.address,
+    programWallet,
+    100000000000 // because decimals for the mint are set to 9 
+  )
+
 
   console.log(
     `Minted initial supply of ${initialSupply} ${tokenName} tokens to the program wallet`
