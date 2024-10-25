@@ -78,9 +78,17 @@ export const swapsolana = async (req, res) => {
     ); // Initial supply of 1B tokens for example
     console.log("🚀 ~ swapsolana ~ tokenMint:", tokenMint);
 
+  //   const programTokenAccount = await getOrCreateAssociatedTokenAccount(
+  //     connection,    // Connection to the Solana cluster
+  //     programWallet,         // Payer's Keypair
+  //     devSolMintAddress,          // Mint address (should be a valid PublicKey)
+  //     programWallet.publicKey         // Owner's address (should be a valid PublicKey)
+  // );
+
     // Ensure the user has an associated token account for DeVSol
     const userDevSolTokenAccount = await getOrCreateAssociatedTokenAccount(
       connection,
+      programWallet,
       devSolMintAddress, // DeVSol mint address provided by the frontend
       userWallet // User's wallet to receive DeVSol
     );
@@ -88,6 +96,7 @@ export const swapsolana = async (req, res) => {
     // Ensure the program has an associated token account for DeVSol (program receives DeVSol)
     const programDevSolTokenAccount = await getOrCreateAssociatedTokenAccount(
       connection,
+      programWallet,
       devSolMintAddress, // DeVSol mint address
       programWallet.publicKey // Program wallet
     );
