@@ -1,5 +1,6 @@
 import { LAMPORTS_PER_SOL, sendAndConfirmTransaction } from "@solana/web3.js";
 import bs58 from "@coral-xyz/anchor/dist/cjs/utils/bytes/bs58.js";
+import { createMint } from '@solana/spl-token';
 import {
   Connection,
   PublicKey,
@@ -290,7 +291,7 @@ const createTokenIfNotExists = async (
   }
 
   // Mint a new token if it doesn't exist
-  const tokenMint = await splToken.Token.createMint(
+  const tokenMint = await createMint(
     connection,
     programWallet, // Program wallet or admin wallet
     mintAuthority.publicKey, // Mint authority
